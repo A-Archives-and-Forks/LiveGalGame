@@ -26,7 +26,8 @@ import androidx.compose.ui.tooling.preview.Preview
 fun KeywordDialog(
 	onAccept: () -> Unit,
 	onReject: () -> Unit,
-	onDismiss: () -> Unit
+	onDismiss: () -> Unit,
+	onSelectBgm: (String) -> Unit
 ) {
 	val dialogShape = RoundedCornerShape(16.dp)
 	val dialogPink = Color(0xCCFFC0CB)
@@ -60,7 +61,10 @@ fun KeywordDialog(
 				) {
 					OutlinedButton(
 						modifier = Modifier.fillMaxWidth(),
-						onClick = onReject,
+						onClick = {
+							onReject()
+							onSelectBgm("casual.mp3")
+						},
 						shape = dialogShape,
 						border = BorderStroke(2.dp, borderColor),
 						colors = ButtonDefaults.outlinedButtonColors(
@@ -72,7 +76,10 @@ fun KeywordDialog(
 					}
 					OutlinedButton(
 						modifier = Modifier.fillMaxWidth(),
-						onClick = onAccept,
+						onClick = {
+							onAccept()
+							onSelectBgm("Ah.mp3")
+						},
 						shape = dialogShape,
 						border = BorderStroke(2.dp, borderColor),
 						colors = ButtonDefaults.outlinedButtonColors(
@@ -94,6 +101,7 @@ private fun KeywordDialogPreview() {
 	KeywordDialog(
 		onAccept = {},
 		onReject = {},
-		onDismiss = {}
+		onDismiss = {},
+		onSelectBgm = {}
 	)
 }

@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
                     val lifecycleOwner = LocalLifecycleOwner.current
                     val speechListener = remember { KeywordSpeechListener(keyword = "吗") }
                     var showKeywordDialog by remember { mutableStateOf(false) }
+                    var idleBgmAsset by remember { mutableStateOf("bgm.mp3") }
 
                     LaunchedEffect(speechListener) {
                         speechListener.keywordTriggers.collect {
@@ -108,25 +109,29 @@ class MainActivity : ComponentActivity() {
                         onRecognizedText = { text, isFinal ->
                             speechListener.onRecognizedText(text, isFinal)
                         },
-                        isDialogVisible = showKeywordDialog
+                        isDialogVisible = showKeywordDialog,
+                        idleBgmAsset = idleBgmAsset
                     )
 
                     if (showKeywordDialog) {
                         KeywordDialog(
                             onAccept = {
                                 Log.d("MainActivity", "Keyword accepted")
+                                idleBgmAsset = "Ah.mp3"
                                 showKeywordDialog = false
                                 speechListener.startListening()
                             },
                             onReject = {
                                 Log.d("MainActivity", "Keyword rejected")
+                                idleBgmAsset = "casual.mp3"
                                 showKeywordDialog = false
                                 speechListener.startListening()
                             },
                             onDismiss = {
                                 showKeywordDialog = false
                                 speechListener.startListening()
-                            }
+                            },
+                            onSelectBgm = { asset -> idleBgmAsset = asset }
                         )
                     }
                 } else {

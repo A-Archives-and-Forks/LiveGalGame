@@ -90,7 +90,8 @@ fun CameraScreen(
     cameraExecutor: ExecutorService,
     chapterTitle: String = "Chapter 1",
     onRecognizedText: (text: String, isFinal: Boolean) -> Unit = { _, _ -> },
-    isDialogVisible: Boolean = false
+    isDialogVisible: Boolean = false,
+    idleBgmAsset: String = "bgm.mp3"
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -164,8 +165,8 @@ fun CameraScreen(
         }
     }
 
-    LaunchedEffect(isDialogVisible) {
-        val targetAsset = if (isDialogVisible) "TeaBreak.mp3" else "bgm.mp3"
+    LaunchedEffect(isDialogVisible, idleBgmAsset) {
+        val targetAsset = if (isDialogVisible) "TeaBreak.mp3" else idleBgmAsset
         switchBgm(targetAsset)
     }
 
