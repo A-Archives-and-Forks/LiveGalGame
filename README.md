@@ -8,7 +8,7 @@
 
 APP在/release文件夹中可以直接下载，报毒是正常状况，请放心使用
 
-目前检测到提问时会弹出对话框，后续可以加更好玩的功能
+目前检测到提问时会弹出对话框，后续可以加更好玩的功能.
 
 <img width="2533" height="1427" alt="image" src="https://github.com/user-attachments/assets/65dd6c6f-bf47-4bc0-9695-034c7faa290d" />
 
