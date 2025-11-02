@@ -1,5 +1,7 @@
 package com.example.livegg1.ui
 
+import android.content.ContentValues
+import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import androidx.compose.runtime.mutableStateListOf
@@ -51,6 +53,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -88,8 +91,12 @@ import androidx.camera.core.Preview as CameraPreview
 import androidx.core.content.ContextCompat
 import android.media.MediaPlayer
 import java.lang.IllegalStateException
+import android.os.Build
+import android.provider.MediaStore
+import android.view.View
 import com.example.livegg1.R
 import kotlin.random.Random
+import android.graphics.Canvas as AndroidCanvas
 
 @Composable
 fun CameraScreen(
@@ -107,6 +114,7 @@ fun CameraScreen(
     val configuration = LocalConfiguration.current
     val screenAspectRatio = configuration.screenWidthDp.toFloat() / configuration.screenHeightDp.toFloat()
     val coroutineScope = rememberCoroutineScope()
+    val rootView = LocalView.current
 
     // --- 状态管理 ---
     var imageToShow by remember { mutableStateOf<Bitmap?>(null) }
@@ -145,6 +153,26 @@ fun CameraScreen(
     fun bumpAffection() {
         coroutineScope.launch {
             affectionLevel = (affectionLevel + 0.009f).coerceIn(0f, 1f)
+        }
+    }
+
+    fun saveCurrentScreen(label: String) {
+        coroutineScope.launch {
+            if (rootView.width == 0 || rootView.height == 0) {
+                Log.w("CameraScreen", "Skipping screenshot; view not laid out")
+                return@launch
+            }
+            val bitmap = captureViewBitmap(rootView)
+            try {
+                withContext(Dispatchers.IO) {
+                    saveBitmapToGallery(context, bitmap, label)
+                }
+                Log.i("CameraScreen", "Screenshot saved: $label")
+            } catch (error: Exception) {
+                Log.e("CameraScreen", "Screenshot save failed", error)
+            } finally {
+                bitmap.recycle()
+            }
         }
     }
 
@@ -371,6 +399,7 @@ fun CameraScreen(
         previewView = { AndroidView({ previewView }, modifier = Modifier.fillMaxSize()) },
         affectionLevel = affectionLevel,
         heartOffsetY = 12.dp,
+        onSaveSnapshot = ::saveCurrentScreen,
         onManageTriggers = onManageTriggers
     )
 }
@@ -388,6 +417,7 @@ private fun CameraScreenContent(
     previewView: @Composable () -> Unit,
     affectionLevel: Float,
     heartOffsetY: Dp = 8.dp,
+    onSaveSnapshot: (String) -> Unit = {},
     onManageTriggers: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -614,13 +644,19 @@ private fun CameraScreenContent(
                 horizontalArrangement = Arrangement.spacedBy(-10.dp)
             ) {
                     val btnHeight = 16.dp
-                    TextButton(onClick = { Log.d("CameraScreen", "Button 1 clicked") }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.height(btnHeight)) {
+                    TextButton(onClick = {
+                        Log.d("CameraScreen", "Button 1 clicked")
+                        onSaveSnapshot("save")
+                    }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.height(btnHeight)) {
                         Text(text = "SAVE", fontSize = 12.sp, color = Color.White)
                     }
                     TextButton(onClick = { Log.d("CameraScreen", "Button 2 clicked") }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.height(btnHeight)) {
                         Text(text = "LOAD", fontSize = 12.sp, color = Color.White)
                     }
-                    TextButton(onClick = { Log.d("CameraScreen", "Button 3 clicked") }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.height(btnHeight)) {
+                    TextButton(onClick = {
+                        Log.d("CameraScreen", "Button 3 clicked")
+                        onSaveSnapshot("quick_save")
+                    }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.height(btnHeight)) {
                         Text(text = "Q.SAVE", fontSize = 12.sp, color = Color.White)
                     }
                     TextButton(onClick = { Log.d("CameraScreen", "Button 4 clicked") }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.height(btnHeight)) {
@@ -733,7 +769,59 @@ fun CameraScreenPreview() {
                 Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray))
             },
             affectionLevel = 0.55f,
+            onSaveSnapshot = {},
             onManageTriggers = {}
         )
+    }
+}
+
+private fun captureViewBitmap(view: View): Bitmap {
+    val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+    val canvas = AndroidCanvas(bitmap)
+    view.draw(canvas)
+    return bitmap
+}
+
+private fun saveBitmapToGallery(context: Context, bitmap: Bitmap, label: String) {
+    val resolver = context.contentResolver
+    val timeStamp = System.currentTimeMillis()
+    val fileName = "LiveGG_${label}_${timeStamp}.png"
+    val imageCollection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+    } else {
+        MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+    }
+
+    val contentValues = ContentValues().apply {
+        put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+        put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            put(MediaStore.Images.Media.IS_PENDING, 1)
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/LiveGG")
+        }
+    }
+
+    val imageUri = resolver.insert(imageCollection, contentValues)
+    if (imageUri == null) {
+        Log.e("CameraScreen", "Failed to insert MediaStore entry")
+        return
+    }
+
+    resolver.openOutputStream(imageUri)?.use { stream ->
+        if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)) {
+            Log.e("CameraScreen", "Failed to compress bitmap")
+            resolver.delete(imageUri, null, null)
+            return
+        }
+    } ?: run {
+        Log.e("CameraScreen", "Failed to open output stream for screenshot")
+        resolver.delete(imageUri, null, null)
+        return
+    }
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        contentValues.clear()
+        contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
+        resolver.update(imageUri, contentValues, null, null)
     }
 }
